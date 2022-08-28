@@ -1,0 +1,24 @@
+import Animal;
+
+class Rat extends Animal {
+	
+	public Rat(int poids) {
+		setVivant(true);
+		setPoids(poids);
+	}
+	
+	// On ne mange qu'un dixieme du poids de l'autre animal.
+	public void manger(Animal a) {
+		if (!a.getVivant()) {
+			int morceauViande = getPoids();
+			
+			if (morceauViande > a.getPoids()) {
+				morceauViande = a.getPoids();
+			}
+			
+			setPoids(getPoids() + morceauViande);
+			a.setPoids(a.getPoids() - morceauViande);
+		}
+	}
+	
+}

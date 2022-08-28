@@ -1,0 +1,36 @@
+// Classe "abstraite" Animal.
+class Animal {
+	private boolean vivant;
+	private int poids;
+	
+	private Animal() { }
+	
+	public void attaquer(Animal a) { }
+	
+	// Par defaut, on mange l'animal en entier
+	public void manger(Animal a) {
+		if (!a.vivant) {
+			poids = poids + a.poids;
+			
+			a.poids = 0;
+			a.vivant = false;
+		}
+	}
+	
+	public void setVivant(boolean v) {
+		vivant = v;
+	}
+	
+	public boolean getVivant() {
+		return vivant;
+	}
+	
+	public void setPoids(int p) {
+		poids = p;
+	}
+	
+	public int getPoids() {
+		return poids;
+	}
+	
+}

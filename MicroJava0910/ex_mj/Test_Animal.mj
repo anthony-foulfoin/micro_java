@@ -1,0 +1,42 @@
+import Animal;
+import Chat;
+import Rat;
+
+class Test_Animal {
+
+	public void main(int args) {
+		int poidsChat1; 
+		
+		// Creation des animaux
+		Animal chat1 = new Chat(6000);
+		Animal chat2 = new Chat(5000);
+		Animal rat1 = new Rat(500);
+		Animal rat2 = new Rat(500);
+		
+		// chat1 attaque chat2 
+		chat1.attaquer(chat2);
+		
+		// Les rats mangent la depouille de chat2
+		rat1.manger(chat2);
+		rat2.manger(chat2);
+
+		// Les rats, tres agressifs, attaquent ensuite chat1
+		rat1.attaquer(chat1);
+		rat2.attaquer(chat1);
+		
+		// chat1 riposte
+		chat1.attaquer(rat1);
+		chat1.attaquer(rat2);
+		
+		// chat1 mange les rats
+		chat1.manger(rat1);
+		chat1.manger(rat2);
+		
+		// Variables de verification
+		poidsChat1 = chat1.getPoids();				// 8000
+		boolean chat1Vivant = chat1.getVivant();	// true
+		boolean chat2Vivant = chat2.getVivant();	// false
+		boolean rat1Vivant = rat1.getVivant();		// false
+		boolean rat2Vivant = rat2.getVivant();		// false
+	}
+}

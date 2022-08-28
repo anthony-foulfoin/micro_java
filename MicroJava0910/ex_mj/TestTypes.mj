@@ -1,0 +1,35 @@
+import Point;
+
+class TestTypes {
+
+	private int x;
+	private int x;
+	
+	public void main(){
+		Point p = new Point(0,0);
+		int x = true;
+		boolean b = 3;
+		TestTypes t = 4;
+		TestTypes t = null;
+		TestTypes t = new Point(0,0);
+		int x = null;
+		MethodeFantome();
+		r = 4;
+		
+		p.x;
+		x;
+		if(3){}
+		if(false){}
+		3>true;
+		3>2;
+		p > p;
+		p == 3;
+		p == null;
+		p == p;
+		!true;
+		!1;
+		3 + 1;
+		3 + true;
+		3 + p;
+	}
+}

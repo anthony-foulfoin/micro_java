@@ -1,0 +1,14 @@
+class Fact {
+  public int facto(int n) {
+    if(n <1) { 
+      return 1; 
+      }
+    else {
+      return n * facto(n-1);
+      }
+    }
+
+  public void main(int arg) {
+    int x = facto(6);
+  }
+}

@@ -1,0 +1,2205 @@
+------------------------------------------
+-- PROJET 07-08 - micro java : grammaire LL(3)
+-- au format EGG5
+------------------------------------------
+option auto= true;
+option version = 1.0 ;
+option k=3;
+
+-- Les attributs semantiques
+inh source : MJAVASourceFile for PROGRAMME, IMPORTS, IMPORT;
+inh machine : AbstractMachine for DEFCLASSE, EXTENSION, DEFS, DEF, TYPE, PARFS, BLOC, 
+                        PARF, PARFSX, INSTS, INST, AFFX, E, SIX, ER, ES, ERX, 
+                        T, ESX, F, TX, ARGS, Q, ARGSX, OPREL, OPADD, OPMUL, OPUN;
+inh classe_courante : InfoClasse for DEFS, DEF, BLOC, INSTS, INST, AFFX, E, SIX, ER, ES, ERX, 
+                        T, ESX, F, TX, ARGS, Q, ARGSX;
+inh methode_courante : InfoMethode for PARFS, PARF, PARFSX,
+                        BLOC, INSTS, INST, AFFX, E, SIX, ER, ES, ERX, 
+                        T, ESX, F, TX, ARGS, Q, ARGSX;
+inh tdc : TDS<InfoClasse> for IMPORTS, IMPORT,
+                        DEFCLASSE, EXTENSION, DEFS, DEF, TYPE, PARFS, BLOC, 
+                        PARF, PARFSX, INSTS, INST, AFFX, E, SIX, ER, ES, ERX, 
+                        T, ESX, F, TX, ARGS, Q, ARGSX;
+inh tdv : TDS<InfoVar> for BLOC, INSTS, INST, AFFX, E, SIX, ER, ES, ERX, 
+                        T, ESX, F, TX, ARGS, Q, ARGSX;
+inh params : Iterator<InfoVar> for ARGS, ARGSX;
+inh identh : String for Q;
+inh methodeh : InfoMethode for Q;
+inh estAttribut : Boolean for Q;
+inh typeh: Type for Q;
+syn type : Type for TYPE, AFFX, E, ER, ERX, ES, ESX, T, TX, F, OPADD, OPUN, OPMUL, Q;
+syn affectable : boolean for AFFX, E, ER, ES, T, F, Q;
+syn classe_mere : InfoClasse for EXTENSION;
+inh deplAttribut : int for DEFS, DEF;
+syn tailleAttribut : int for DEF;
+inh deplMethodePublique : int for DEFS, DEF;
+syn redefinition : boolean for DEF;
+syn estConstructeur : boolean for DEF;
+inh deplVariable : int for BLOC, INSTS, INST, SIX;
+syn tailleVariables : int for INSTS, INST;
+inh protectionPublic : boolean for DEF;
+syn code : String for DEFCLASSE, DEFS, DEF, BLOC, INSTS, INST, AFFX, E, SIX, ER, ES, ERX, 
+                        T, ESX, F, TX, ARGS, Q, ARGSX, OPREL, OPADD, OPMUL, OPUN;
+inh code_variable : String for Q;
+inh codeh : String for Q;
+inh code_methode : String for Q;
+inh est_local : Boolean for Q;
+syn op : String for OPREL, ERX;
+
+-- Les terminaux 
+space separateur is  "[\r\n\t ]+";
+space comm is  "\/\/[^\n]*\n";
+sugar import is  "import";
+sugar paro is  "\(";
+sugar parf is  "\)";
+sugar aco is  "\{";
+sugar acf is  "\}";
+sugar cro is  "\[";
+sugar crf is  "\]";
+sugar virg is  ",";
+sugar pv is  "\;";
+sugar pt is  "\.";
+sugar affect is  "=";
+sugar si is  "if";
+sugar sinon is  "else";
+sugar tantque is  "while";
+sugar void is  "void";
+sugar int is  "int";
+sugar bool is  "boolean";
+sugar classe is  "class";
+sugar etend is  "extends";
+sugar retour is  "return";
+sugar nouveau is  "new";
+sugar public is  "public";
+sugar private is  "private";
+sugar null is  "null";
+sugar inf is  "\<";
+sugar infeg is  "\<=";
+sugar sup is  "\>";
+sugar supeg is  "\>=";
+sugar eg is  "==";
+sugar neg is  "\!=";
+sugar plus is  "\+";
+sugar moins is  "\-";
+sugar ou is  "\|\|";
+sugar mult is  "\*";
+sugar div is  "\/";
+sugar mod is  "\%" ; 
+sugar et is  "\&\&";
+sugar non is  "\!";
+sugar vrai is  "true"; 
+sugar faux is  "false";
+sugar this is  "this";
+sugar super is  "super";
+term entier is  "[0-9]+";
+term ident is  "[_A-Za-z][_0-9A-Za-z]*";
+
+---------- REGLES DE PRODUCTION ----------------------------------------
+PROGRAMME -> #init #tdc IMPORTS DEFCLASSE #gen;
+global
+   machine : AbstractMachine;
+   tdc : TDS<InfoClasse>;
+   
+#init {
+local
+do
+   machine := PROGRAMME^source.getMachine();
+   DEFCLASSE^machine := machine;
+end
+} 
+
+#tdc {
+local
+    -- On est oblige d'instancier MJC en egg, meme si on ne manipule
+    -- que des methodes statiques de la classe.
+    mjc : MJC;
+do
+    mjc := new MJC();
+    tdc := mjc.getTdc();
+    
+    IMPORTS^tdc := tdc;
+    DEFCLASSE^tdc := tdc;
+end
+}
+
+#gen {
+local
+    nomFicSource : String;
+    -- On est oblige d'instancier MJC en egg, meme si on ne manipule que ses methodes statiques.
+    -- En effet, faire directement MJC.une_methode_statique(...) ne marche pas en egg
+    mjc : MJC;
+do
+    -- On ne genere le fichier TAM que de la classe qu'on a donne en tout premier a MJC.
+    mjc := new MJC();
+    nomFicSource := PROGRAMME^source.getFileName();
+    
+    if nomFicSource.equals(mjc.getFichierTAMResultat()) then
+        call machine.writeCode(nomFicSource, DEFCLASSE^code);
+    end
+end
+}
+
+IMPORTS ->  ;
+
+
+IMPORTS -> IMPORT IMPORTS;
+
+IMPORT -> import ident pv #importer_classe;
+#importer_classe {
+local
+    fichierClasseCourante : File;
+    dossierCourant : String;
+    -- On est oblige d'instancier MJC en egg, meme si on ne manipule que ses methodes statiques.
+    -- En effet, faire directement MJC.une_methode_statique(...) ne marche pas en egg
+    mjc : MJC;
+do
+    -- On parse la classe correspondant a l'ident uniquement si elle n'a pas deja ete parsee.
+    fichierClasseCourante := new File(IMPORT^source.getFileName());
+    dossierCourant := fichierClasseCourante.getParent();
+    mjc := new MJC();
+    if (IMPORT^tdc.chercherLocalement(ident^txt) = nil) then
+        call mjc.mainUniqueArgument(dossierCourant + "/" + ident^txt + ".mj");
+    end
+end
+}
+
+-- definition d'une classe
+DEFCLASSE -> classe ident EXTENSION #tdc #deplAttrMeth aco DEFS acf #verif_constructeur #code #deplTV;
+global
+    info : InfoClasse;
+    constructeur_par_defaut : InfoMethode;
+
+#tdc {
+local
+    -- On est oblige d'instancier MJC en egg, meme si on ne manipule
+    -- que des methodes statiques de la classe.
+    mjc : MJC;
+do    
+    -- On verifie que ident n'est pas dans la table des classes
+    info := DEFCLASSE^tdc.chercherGlobalement(ident^txt);
+    if info /= nil then
+        error(MJAVA_classe_definie, ident^txt);
+    end
+    
+    -- On cree la classe et on l'insere dans la table des classes
+    mjc := new MJC();
+    info := new InfoClasse(EXTENSION^classe_mere, mjc.getDeplTVClasse(), ident^txt);
+    call DEFCLASSE^tdc.put(ident^txt, info);
+    DEFS^classe_courante := info;
+end
+}
+
+#deplAttrMeth {
+local
+    parente : InfoClasse;
+    attr : InfoAttribut;
+    meth : InfoMethode;
+    depl : int;
+do
+    parente := info.getParente();
+    if (parente = nil) then
+        -- Le deplacement des attributs dans l'objet commence a 1.
+        -- En effet, l'emplacement 0 dans l'objet est reserve pour contenir l'adresse
+        -- de la table des virtuelles de la classe.
+        DEFS^deplAttribut := 1;
+        
+        -- Le déplacement des methodes est local a table des virtuelles. Il commence a 0.
+        DEFS^deplMethodePublique := 0;
+    else
+        attr := parente.getDernierAttribut();
+        if attr = nil then 
+            depl := 1;
+        else
+            depl := attr.getDeplacement() + 1;
+        end
+        DEFS^deplAttribut := depl;
+        
+        meth := parente.getDerniereMethPublique();
+        if meth = nil then 
+            depl := 0;
+        else
+            depl := meth.getDeplacement() + 1;
+        end
+        DEFS^deplMethodePublique := depl;
+    end
+end
+}
+
+#verif_constructeur {
+local
+do
+    constructeur_par_defaut := nil;
+    
+    if info.getConstructeur() = nil then
+        constructeur_par_defaut := new InfoMethode(ident^txt,-1, true, nil, info);
+        call info.setConstructeur(constructeur_par_defaut);
+    end
+end
+}
+
+#deplTV {
+local
+    tm : TDS<InfoMethode>;
+    -- On est oblige d'instancier MJC en egg, meme si on ne manipule
+    -- que des methodes statiques de la classe.
+    mjc : MJC;
+do
+    mjc := new MJC();
+    tm := info.getTableMethodes();
+    call mjc.setDeplTVClasse(mjc.getDeplTVClasse() + info.getTailleTV());
+end
+}
+
+#code {
+local
+    code_constructeur_defaut : String;
+do
+    call info.setCode(DEFS^code);
+    
+    if constructeur_par_defaut /= nil then
+        call info.setCode(info.getCode() +
+                          DEFCLASSE^machine.genCodeConstructeur(constructeur_par_defaut, "", info));
+    end
+    
+    DEFCLASSE^code := DEFCLASSE^machine.genTableVirtuelles(DEFCLASSE^tdc) @ 
+                        DEFCLASSE^machine.genCodeClasses(DEFCLASSE^tdc);
+end
+}
+
+-- heritage
+EXTENSION -> etend ident #classe_mere;
+#classe_mere {
+local
+    info : InfoClasse;
+do
+    -- Recherche de ident dans la table des classes
+    info := EXTENSION^tdc.chercherGlobalement(ident^txt);
+    if info = nil then
+        error(MJAVA_classe_inconnue, ident^txt);
+    end
+    
+    EXTENSION^classe_mere := info;
+end
+}
+
+EXTENSION ->  #classe_mere;
+#classe_mere {
+local
+do
+    -- Pour dire qu'une classe n'a pas de classe mere,
+    -- on dit que sa classe mere est nulle
+    EXTENSION^classe_mere := nil;
+end
+}
+
+-- les attributs
+DEFS ->   #code;
+#code{
+do
+    DEFS^code := "";
+end
+}
+
+DEFS ->  public #protection DEF #depl DEFS #code  ;
+#protection {
+local
+do
+    DEF^protectionPublic := true;
+end
+}
+
+#depl {
+local
+do
+    DEFS1^deplAttribut := DEFS^deplAttribut + DEF^tailleAttribut;
+    
+    -- Si ce qu'on vient de traiter est une methode publique (hors constructeur)
+    -- non redefinie, on met a jour le deplacement de la prochaine methode publique.
+    if DEF^tailleAttribut=0 & ~DEF^estConstructeur & ~DEF^redefinition then
+        DEFS1^deplMethodePublique := DEFS^deplMethodePublique + 1;
+    end
+end
+}
+
+#code{
+do
+    DEFS^code := DEF^code @ DEFS1^code;
+end
+}
+
+DEFS ->  private #protection DEF #depl DEFS  #code ;
+#protection {
+local
+do
+    DEF^protectionPublic := false;
+end
+}
+
+#depl {
+local
+do
+    DEFS1^deplAttribut := DEFS^deplAttribut + DEF^tailleAttribut;
+    
+    -- On ne tient pas compte du deplacement pour une methode privee
+end
+}
+
+#code{
+do
+    DEFS^code := DEF^code @ DEFS1^code;
+end
+}
+
+-- attribut
+DEF ->  TYPE ident pv #creer_attribut #taille #code;
+global
+    info : InfoAttribut;
+
+#creer_attribut {
+local
+    tableAttributs : TDS<InfoAttribut>;
+do
+    DEF^redefinition := false;
+    DEF^estConstructeur := false;
+    tableAttributs := DEF^classe_courante.getTableAttributs();
+
+    -- On verifie que ident n'est pas dans la table des attributs
+    info := tableAttributs.chercherLocalement(ident^txt);
+    if info /= nil then
+       error(MJAVA_attribut_defini, ident^txt);
+    end
+       
+    -- On cree l'attribut et on l'insere dans la table des attributs
+    info := new InfoAttribut(DEF^deplAttribut, DEF^protectionPublic, TYPE^type, DEF^classe_courante, ident^txt);
+    call tableAttributs.put(ident^txt,  info);
+    
+    -- On le signale comme dernier attribut insere
+    call DEF^classe_courante.setDernierAttribut(info);
+end
+}
+
+#taille {
+local
+    t : Type;
+do
+    t := info.getType();
+    -- Si on a un objet, il occupe un place memoire, celle de son pointeur
+    match t with 
+        InfoClasse then
+            DEF^tailleAttribut := 1;
+        else
+            DEF^tailleAttribut := t.getTaille();
+    end
+end
+}
+
+#code{
+local
+do
+    DEF^code := "";
+end
+}
+
+
+-- methode (fonction)
+DEF ->  TYPE ident paro #creer_methode PARFS parf #inserer_methode #tdv #depl BLOC #taille #code;
+global
+    tableMethodes : TDS<InfoMethode>;
+    info : InfoMethode;
+
+#creer_methode {
+local
+    depl : int;
+    redefinition : boolean;
+do
+    tableMethodes := DEF^classe_courante.getTableMethodes();
+    redefinition := false;
+    
+    if DEF^protectionPublic then
+        depl := DEF^deplMethodePublique;
+    else
+        -- Une methode privee n'a pas de deplacement dans la table des virtuelles
+        -- car elle ne s'y trouve pas
+        depl := -1;  
+    end
+
+    -- La methode ne doit pas avoir le meme nom que la classe.
+    -- En effet, seul le constructeur le peut.
+    if (ident^txt.equalsIgnoreCase(DEF^classe_courante.getNom())) then
+        error(MJAVA_methode_nom_classe);
+    end
+
+    -- On verifie que ident n'est pas dans la table des methodes
+    info := tableMethodes.chercherLocalement(ident^txt);
+    if info /= nil then
+       error(MJAVA_methode_definie, ident^txt);
+    end
+    
+    info := tableMethodes.chercherGlobalement(ident^txt);
+    if info /= nil then
+        -- Redefinition. Seule une methode publique peut etre redefinie.
+        if info.estPublic() then
+            if ~DEF^protectionPublic then
+                error(MJAVA_reduction_visibilite, ident^txt);            
+            end
+            
+            redefinition := true;
+            depl := info.getDeplacement();
+        end
+    end
+    
+    -- On cree la methode
+    info := new InfoMethode(ident^txt, depl, DEF^protectionPublic, TYPE^type, DEF^classe_courante);
+    
+    PARFS^methode_courante := info;
+    BLOC^methode_courante := info;
+    DEF^redefinition := redefinition;
+    DEF^estConstructeur := false;
+end
+}
+
+#inserer_methode {
+local
+do
+    -- Au prealable, on met a jour le deplacement des parametres de la methode
+    call info.majDeplParams();
+    
+    -- On insere la methode dans la table des methodes
+    call tableMethodes.put(ident^txt,  info);
+end
+}
+
+#tdv {
+local
+do
+    BLOC^tdv := new TDS<InfoVar>(info.getTableParametres());
+end
+}
+
+#depl {
+local
+do
+    -- Le deplacement d'une variable se fait au sein de LB.
+    -- Les 3 premiers emplacements de LB sont reserves, on commence donc a 3.
+    BLOC^deplVariable := 3;
+end
+}
+
+#taille {
+local
+do
+    DEF^tailleAttribut := 0;
+end
+}
+
+#code{
+local
+do
+    -- On ecrit le code de la methode dans le fichier d'assemblage
+    DEF^code := DEF^machine.genCodeMethode(info, BLOC^code, DEF^classe_courante);
+end
+}
+
+-- methode (procedure)
+DEF -> void ident paro #creer_methode PARFS parf #inserer_methode #tdv #depl BLOC #taille #code;
+global
+    tableMethodes : TDS<InfoMethode>;
+    info : InfoMethode;
+
+#creer_methode {
+local
+    depl : int;
+    redefinition : boolean;
+do
+    tableMethodes := DEF^classe_courante.getTableMethodes();
+    redefinition := false;
+    if DEF^protectionPublic then
+        depl := DEF^deplMethodePublique;
+    else
+        -- Une methode privee n'a pas de deplacement dans la table des virtuelles
+        depl := -1;  
+    end
+
+	-- La methode ne doit pas avoir le meme nom que la classe.
+    -- En effet, seul le constructeur le peut.
+    if (ident^txt.equalsIgnoreCase(DEF^classe_courante.getNom())) then
+        error(MJAVA_methode_nom_classe);
+    end
+    
+    -- On verifie que ident n'est pas dans la table des methodes
+    info := tableMethodes.chercherLocalement(ident^txt);
+    if info /= nil then
+       error(MJAVA_methode_definie, ident^txt);
+    end
+    
+    info := tableMethodes.chercherGlobalement(ident^txt);
+    if info /= nil then
+        -- Redefinition. Seule une methode publique peut etre redefinie.
+        if info.estPublic() then
+            if ~DEF^protectionPublic then
+                error(MJAVA_reduction_visibilite, ident^txt);            
+            end
+            
+            redefinition := true;
+            depl := info.getDeplacement();
+        end
+    end
+    -- On cree la methode
+    info := new InfoMethode(ident^txt, depl, DEF^protectionPublic, nil, DEF^classe_courante);
+    
+    PARFS^methode_courante := info;
+    BLOC^methode_courante := info;
+    DEF^redefinition := redefinition;
+    DEF^estConstructeur := false;
+end
+}
+
+#inserer_methode {
+local
+do
+    -- Au prealable, on met a jour le deplacement des parametres de la methode
+    call info.majDeplParams();
+    
+    -- On insere la methode dans la table des methodes
+    call tableMethodes.put(ident^txt,  info);
+end
+}
+
+#tdv {
+local
+do
+    BLOC^tdv := new TDS<InfoVar>(info.getTableParametres());
+end
+}
+
+#depl {
+local
+do
+    -- Le deplacement d'une variable se fait au sein de LB.
+    -- Les 3 premiers emplacements de LB sont reserves, on commence donc a 3.
+    BLOC^deplVariable := 3;
+end
+}
+
+#taille {
+local
+do
+    DEF^tailleAttribut := 0;
+end
+}
+
+#code{
+local
+do
+    -- On ecrit le code de la methode dans le fichier d'assemblage
+    DEF^code := DEF^machine.genCodeMethode(info, BLOC^code, DEF^classe_courante);
+end
+}
+
+-- constructeur
+DEF -> ident  paro #creer_constructeur PARFS parf #inserer_constructeur #tdv #depl BLOC #taille #code;
+global
+    info : InfoMethode;
+
+#creer_constructeur {
+local
+do
+    -- On verifie que ident porte le meme nom que la classe.
+    -- Si ce n'est pas le cas, on suppose que l'utilisateur a voulu definir une methode
+    -- classique (avec type de retour), mais qu'il a oublie de preciser le type de retour.
+    -- On le lui signale.    
+    if ~ident^txt.equals(DEF^classe_courante.getNom()) then
+        error(MJAVA_type_retour_manquant, ident^txt);
+    end
+
+    -- On verifie que le constructeur n'a pas deja ete defini
+    if DEF^classe_courante.getConstructeur() /= nil then
+        error(MJAVA_constructeur_defini);
+    end
+       
+    -- On cree le constructeur
+    info := new InfoMethode(ident^txt, -1, DEF^protectionPublic, nil, DEF^classe_courante);
+    
+    PARFS^methode_courante := info;
+    BLOC^methode_courante := info;
+    DEF^redefinition := false;
+    DEF^estConstructeur := true;
+end
+}
+
+#inserer_constructeur {
+local
+do
+    -- Au prealable, on met a jour le deplacement des parametres de la methode
+    call info.majDeplParams();
+
+    -- On affecte le constructeur a la classe courante
+    call DEF^classe_courante.setConstructeur(info);
+end
+}
+
+#tdv {
+local
+do
+    BLOC^tdv := new TDS<InfoVar>(info.getTableParametres());
+end
+}
+
+#depl {
+local
+do
+    -- Le deplacement d'une variable se fait au sein de LB.
+    -- Les 3 premiers emplacements de LB sont reserves, on commence donc a 3.
+    BLOC^deplVariable := 3;
+end
+}
+
+#taille {
+local
+do
+    DEF^tailleAttribut := 0;
+end
+}
+
+#code{
+local
+do
+    -- On ecrit le code du constructeur dans le fichier d'assemblage
+    DEF^code := DEF^machine.genCodeConstructeur(info, BLOC^code, DEF^classe_courante);
+end
+}
+-- les types
+TYPE-> int  #type;
+#type {
+local
+do
+   TYPE^type := new Type("int", 1);
+end
+}
+
+TYPE-> bool #type;
+#type {
+local
+do
+   TYPE^type := new Type("bool", 1);
+end
+}
+
+TYPE-> ident #type;
+#type {
+local
+   info : InfoClasse;
+do
+   -- Recherche de ident dans la table des classes
+   info := TYPE^tdc.chercherGlobalement(ident^txt);
+   if info = nil then
+        error(MJAVA_type_inexistant, ident^txt);
+   end
+   
+   TYPE^type := info;
+end
+}
+
+-- parametres de methodes
+PARFS ->  ;
+PARFS ->  PARF PARFSX;
+PARFSX ->  ;
+PARFSX -> virg  PARF  PARFSX;
+
+PARF ->  TYPE ident #creer_param;
+#creer_param {
+local
+    tableParametres : TDS<InfoVar>;
+    info : InfoVar;
+do
+    tableParametres := PARF^methode_courante.getTableParametres();
+
+    -- On verifie que ident n'est pas deja defini en tant que parametre
+    info := tableParametres.chercherLocalement(ident^txt);
+    if info /= nil then
+       error(MJAVA_paramOuVar_defini, ident^txt);
+    end
+
+    -- On ne pourra calculer le deplacement du parametre (par rapport a LB)
+    -- q'une fois qu'on connaitra le nombre total de parametres.
+    -- En attendant, on met temporairement un deplacement de -1 pour tous les parametres.
+    info := new InfoVar(-1, TYPE^type, ident^txt);
+    call tableParametres.put(ident^txt,  info);
+end
+}
+
+-- corps de methode et bloc d'instructions
+BLOC ->  aco INSTS acf #code;
+#code{
+do
+    BLOC^code := BLOC^machine.genBloc(INSTS^code, BLOC^tdv.size());
+end
+}
+
+-- instructions
+INSTS ->  #taille #code;
+#taille{
+local
+do
+    INSTS^tailleVariables := 0;
+end
+}
+
+#code{
+do
+    INSTS^code := "";
+end
+}
+
+INSTS ->  INST #depl INSTS #taille #code;
+#depl {
+local
+do
+    INSTS1^deplVariable := INSTS^deplVariable + INST^tailleVariables;
+end
+}
+
+#taille {
+local
+do
+    INSTS^tailleVariables := INST^tailleVariables + INSTS1^tailleVariables;
+end
+}
+
+#code{
+do
+    INSTS^code := INST^code @ INSTS1^code;
+end
+}
+
+-- declaration de variable locale avec ou sans init
+INST->  TYPE ident AFFX pv #type #tdv #taille #code;
+#type {
+local
+do
+    -- on verifie que les types des 2 membres de l'affectation sont compatibles
+    -- si AFFX possede un type
+    if AFFX^type /= nil then
+        -- on verifie qu'il est compatible avec le type de l'expression a gauche
+       if ~TYPE^type.isCompatible(AFFX^type) then
+            error(MJAVA_types_incompatibles, TYPE^type.getNom(), AFFX^type.getNom());
+        end
+    end
+end
+}
+
+#tdv {
+local
+    info : InfoVar;
+do
+    -- Remarque: la politique de verification employee ici est la meme que celle
+    -- employee dans le langage Java.
+
+    -- On verifie que ident n'est pas dans la table des variables
+    info := INST^tdv.chercherLocalement(ident^txt);
+    if info /= nil then
+       error(MJAVA_paramOuVar_defini, ident^txt);
+    end
+    
+    -- On verifie que ident n'est ni une variable d'un bloc au dessus, ni un parametre.
+    -- On a donc le droit de declarer une variable ayant le meme nom qu'un attribut.
+    info := INST^tdv.chercherGlobalement(ident^txt);
+    if info /= nil then
+        -- Il y a erreur si info n'est pas un InfoAttribut (i.e. si info est un parametre ou une variable)
+        match info with InfoAttribut then
+            else
+                error(MJAVA_paramOuVar_defini, ident^txt);
+        end
+    end
+
+    -- On cree la variable et on l'insere dans la table des variables
+    info := new InfoVar(INST^deplVariable, TYPE^type, ident^txt);
+    call INST^tdv.put(ident^txt,  info);    
+end
+}
+
+#taille{
+local
+do
+    -- Si on a affaire a un objet, la taille est de 1
+    match TYPE^type with
+        InfoClasse then
+            INST^tailleVariables := 1;
+        else
+            INST^tailleVariables := TYPE^type.getTaille();
+    end
+end
+}
+
+--#code{
+--do
+--    INST^code := INST^machine.genDecl(TYPE^type, ident^txt, AFFX^code);
+--end
+--}
+
+#code {
+local
+    valeur : String;
+do
+    -- On verifie si le membre a droite de l'affectation est une valeur ou une adresse
+    -- S'il s'agit d'une adresse et que le membre a gauche est un type primitif
+    -- il faut charger la valeur stockee a cette adresse
+    -- Si le membre a gauche est un objet, on doti charger une adresse
+    -- Si l'element est affectable, c'est qu'il est manipule par son adresse
+    -- si on effectue une affectation
+    valeur := "";
+    if AFFX^type /= nil then
+             if AFFX^affectable then
+                valeur := AFFX^code @ INST^machine.genChargValeurVar(1);
+             else
+                valeur := AFFX^code;
+             end
+    end
+    INST^code := INST^machine.genDecl(TYPE^type, ident^txt, valeur);
+end
+}
+
+-- instruction expression
+INST ->  E pv #taille #code;
+#taille {
+local
+do
+    INST^tailleVariables := 0;
+end
+}
+
+#code{
+do
+    INST^code := E^code;
+end
+}
+
+-- bloc d'instructions
+INST ->  #tdv BLOC #taille #code;
+#tdv {
+local
+do
+    BLOC^tdv := new TDS<InfoVar>(INST^tdv);
+end
+}
+
+#taille {
+local
+do
+    INST^tailleVariables := 0;
+end
+}
+
+#code{
+do
+    INST^code := BLOC^code;
+end
+}
+
+-- conditionnelle
+INST ->  si paro E parf #tdv BLOC SIX #type #taille #code;
+#tdv {
+local
+do
+    BLOC^tdv := new TDS<InfoVar>(INST^tdv);
+end
+}
+
+#type {
+local
+   nomE : String;
+do
+     nomE := E^type.getNom();
+    -- E doit etre un booleen
+    if ~nomE.equals("bool") then
+        error(MJAVA_type_conditionnelle);
+    end 
+end
+}
+
+#taille {
+local
+do
+    INST^tailleVariables := 0;
+end
+}
+
+#code{
+do
+    INST^code := INST^machine.genIf(E^code, BLOC^code, SIX^code);
+end
+}
+
+SIX ->   sinon #tdv BLOC #code;
+#tdv {
+local
+do
+    BLOC^tdv := new TDS<InfoVar>(SIX^tdv);
+end
+}
+
+#code{
+do
+    SIX^code := BLOC^code;
+end
+}
+
+SIX -> #code;
+#code{
+do
+    SIX^code := "";
+end
+}
+-- return
+INST ->  retour E pv #type #taille #code;
+#type {
+local
+    typeRetour : Type;
+do
+
+    -- E doit etre du meme type de retour de la methode qui le contient
+    typeRetour := INST^methode_courante.getTypeRetour();
+    if ~typeRetour.isCompatible(E^type) then
+        error(MJAVA_types_incompatibles,typeRetour.getNom(),E^type.getNom());
+    end  
+end
+}
+
+#taille {
+local
+do
+    INST^tailleVariables := 0;
+end
+}
+
+#code {
+local
+    valeur : String;
+do
+     valeur := E^code;
+     if E^affectable then
+        valeur := E^code @ INST^machine.genChargValeurVar(1) ;
+     end
+    INST^code := valeur @ INST^machine.genRetour(INST^methode_courante);
+end
+}
+
+-- tant que
+INST ->  tantque paro E parf #tdv BLOC #type #taille #code;
+#tdv {
+local
+do
+    BLOC^tdv := new TDS<InfoVar>(INST^tdv);
+end
+}
+
+#type {
+local
+    nomE : String;
+do
+    -- E doit etre un booleen
+    nomE := E^type.getNom();
+    if ~nomE.equals("bool") then
+        error(MJAVA_type_conditionnelle);
+    end 
+end
+}
+
+#taille {
+local
+do
+    INST^tailleVariables := 0;
+end
+}
+
+#code {
+do
+    INST^code := INST^machine.genWhile(E^code, BLOC^code);
+end
+}
+
+-- les expressions
+E ->  ER AFFX #type #code;
+#type {
+local
+do
+    E^affectable := ER^affectable;
+    -- on verifie que les types des 2 membres de l'affectation sont compatibles
+    -- si on effectue une affectation
+    if AFFX^type /= nil then
+        -- on verifie tout d'abord que ER est bien affectable
+        E^affectable := false;
+        if ~ER^affectable then
+            error(MJAVA_exp_non_affectable);
+        end
+        -- on verifie qu'il est compatible avec le type de l'expression a gauche
+       if ~ER^type.isCompatible(AFFX^type) then
+            error(MJAVA_types_incompatibles, ER^type.getNom(), AFFX^type.getNom());
+        end
+    end
+    E^type := ER^type;
+end
+}
+#code {
+local
+    valeur : String;
+do
+    -- On verifie si le membre a droite de l'affectation est une valeur ou une adresse
+    -- S'il s'agit d'une adresse et que le membre a gauche est un type primitif
+    -- il faut charger la valeur stockee a cette adresse
+    -- Si le membre a gauche est un objet, on doti charger une adresse
+    -- Si l'element est affectable, c'est qu'il est manipule par son adresse
+    -- si on effectue une affectation
+    valeur := "";
+    if AFFX^type /= nil then
+	         if AFFX^affectable then
+	            valeur := AFFX^code @ E^machine.genChargValeurVar(1);
+	         else
+	            valeur := AFFX^code;
+	         end
+    end
+    
+    E^code := E^machine.genAffectation(ER^code, valeur);
+end
+}
+-- affectation
+AFFX ->  affect ER  #type #code;
+#type {
+local
+do
+    AFFX^type := ER^type;
+    AFFX^affectable := ER^affectable;
+end
+}
+#code {
+local
+do
+   AFFX^code := ER^code;
+end
+}
+AFFX -> #type #code;
+#type {
+local
+do
+    AFFX^type := nil;
+    AFFX^affectable := false;
+end
+}
+
+#code {
+local
+do
+    AFFX^code := "";
+end
+}
+
+-- relation
+ER ->   ES ERX #type #code;
+#type {
+local
+    ERXnom : String;
+    ESnom : String;
+do
+    -- S'il y a un operateur relationnel
+    if ERX^type /= nil then 
+        -- s'il ne s'agit pas d'une egalite ou non egal
+        if ~ERX^op.equals("eg") & ~ERX^op.equals("neg") then
+            -- l'operateur n'est applicable que sur des int
+            ERXnom := ERX^type.getNom();
+            ESnom := ES^type.getNom();
+            if ~ERXnom.equals("int") | ~ESnom.equals("int") then
+                error(MJAVA_exp_rel_invalide);
+            end
+        else
+	        if ~ERX^type.isCompatible(ES^type) then
+	            error(MJAVA_exp_rel_invalide);
+	        end
+        end
+        
+        -- Dans ce cas le resultat est un booleen
+        ER^type := new Type("bool",1);
+        ER^affectable := false;
+    else
+        -- Sinon c'est celui de ES
+        ER^type := ES^type;
+        ER^affectable := ES^affectable;
+    end
+end
+}
+
+#code {
+local
+    valeur : String;
+do
+    valeur := ES^code;
+    -- S'il y a un operateur
+    if ERX^type /= nil then
+        if ES^affectable then
+            valeur := ES^code @ ER^machine.genChargValeurVar(1);
+        end
+    end
+    ER^code := valeur @ ERX^code;
+end
+}
+
+ES ->  T ESX #type #code;
+#type {
+local
+    nomT : String;
+    nomESX : String;
+do
+    nomT := T^type.getNom();
+    -- S'il y a un operateur
+    if ESX^type /= nil then
+        nomESX := ESX^type.getNom();
+        -- op arithmetique, alors les deux membres doivent etre de type entier
+        if nomESX.equals("int") then
+            if ~nomT.equals("int") then
+                error(MJAVA_exp_arith_invalide);
+            end
+            
+            -- Dans ce cas le resultat est un entier
+            ES^type := new Type("int", 1);
+            ES^affectable := false;
+        elseif nomESX.equals("bool") then
+            if ~nomT.equals("bool") then
+                error(MJAVA_exp_bool_invalide);
+            end
+            
+            -- Dans ce cas le resultat est un booleen
+            ES^type := new Type("bool", 1);
+            ES^affectable := false;  
+        else
+             error(MJAVA_exp_arith_invalide);
+        end
+    else
+        -- Sinon c'est celui de T
+        ES^type := T^type;
+        ES^affectable := T^affectable;
+    end
+end
+}
+#code {
+local
+    valeur : String;
+do
+    valeur := T^code;
+    -- S'il y a un operateur
+    if ESX^type /= nil then
+        if T^affectable then
+            valeur := T^code @ ES^machine.genChargValeurVar(1);
+        end
+    end
+    ES^code := valeur @ ESX^code;
+end
+}
+ERX ->  OPREL ES #type #code;
+#type {
+local
+do
+    ERX^type := ES^type;
+    ERX^op := OPREL^op;
+end
+}
+#code {
+local
+    valeur : String;
+do
+     valeur := ES^code;
+     if ES^affectable then
+        valeur := ES^code @ ERX^machine.genChargValeurVar(1) ;
+     end
+     ERX^code := valeur @ OPREL^code;
+end
+}
+
+
+ERX -> #type #code;
+#type {
+local
+do
+    ERX^type := nil;
+    ERX^op := "";
+end
+}
+
+#code {
+local
+do
+    ERX^code := "";
+end
+}
+
+OPREL -> inf #code;
+#code {
+local
+do
+    OPREL^op := "inf";
+    OPREL^code := OPREL^machine.genInf();
+end
+}
+OPREL -> infeg #code;
+#code {
+local
+do
+    OPREL^op := "infeg";
+    OPREL^code := OPREL^machine.genInfEg();
+end
+}
+OPREL -> sup #code;
+#code {
+local
+do
+    OPREL^op := "sup";
+    OPREL^code := OPREL^machine.genSup();
+end
+}
+OPREL -> supeg #code;
+#code {
+local
+do
+    OPREL^op := "supeg";
+    OPREL^code := OPREL^machine.genSupEg();
+end
+}
+OPREL -> eg #code;
+#code {
+local
+do
+    OPREL^op := "eg";
+    OPREL^code := OPREL^machine.genEq();
+end
+}
+OPREL -> neg #code;
+#code {
+local
+do
+    OPREL^op := "neg";
+    OPREL^code := OPREL^machine.genNeq();
+end
+}
+
+-- addition, ...
+ESX ->   OPADD T ESX #type #code;
+#type {
+local
+    nomOPADD : String;
+    nomT : String;
+    nomESX1 : String;
+do
+    -- S'il y a un operateur arithmetique, alors les deux membres doivent etre de type entier
+    nomOPADD := OPADD^type.getNom();
+    nomT := T^type.getNom();
+    if nomOPADD.equals("int") then
+        if ESX1^type /= nil then
+            nomESX1 := ESX1^type.getNom();
+            if ~nomESX1.equals("int") then
+                error(MJAVA_exp_arith_invalide);
+            end
+        end
+        -- T doit etre de type entier
+        if ~nomT.equals("int") then
+            error(MJAVA_exp_arith_invalide);
+        end
+        -- Dans ce cas le resultat est un entier
+        ESX^type := new Type("int", 1);
+    elseif nomOPADD.equals("bool") then
+        if ESX1^type /= nil then
+            nomESX1 := ESX1^type.getNom();
+            if ~nomESX1.equals("bool") then
+                error(MJAVA_exp_bool_invalide);
+            end
+        end
+        -- T doit etre de type bool
+        if ~nomT.equals("bool") then
+            error(MJAVA_exp_arith_invalide);
+        end
+        -- Dans ce cas le resultat est un booleen
+        ESX^type := new Type("bool", 1);
+    else
+        error(MJAVA_exp_arith_invalide);
+    end
+end
+}
+
+#code {
+local
+    valeur : String;
+do
+    valeur := T^code;
+    if T^affectable then
+	   valeur := T^code @ ESX^machine.genChargValeurVar(1);
+	end
+	ESX^code := valeur @ OPADD^code @ ESX1^code;
+end
+}
+
+ESX -> #type #code;
+#type {
+local
+do
+   ESX^type := nil;
+end
+}
+
+#code {
+local
+do
+   ESX^code := "";
+end
+}
+
+OPADD -> plus #type #code;
+#type {
+local
+do
+   OPADD^type := new Type("int", 1);
+end
+}
+
+#code {
+local
+do
+   OPADD^code := OPADD^machine.genPlus();
+end
+}
+
+OPADD -> moins #type #code;
+#type {
+local
+do
+   OPADD^type := new Type("int", 1);
+end
+}
+
+#code {
+local
+do
+   OPADD^code := OPADD^machine.genMoins();
+end
+}
+
+OPADD -> ou #type #code;
+#type {
+local
+do
+   OPADD^type := new Type("bool", 1);
+end
+}
+
+#code {
+local
+do
+   OPADD^code := OPADD^machine.genOu();
+end
+}
+
+T ->  F TX #type #code;
+#type {
+local
+    nomF : String;
+    nomTX : String;
+do
+    nomF := F^type.getNom();
+    -- S'il y a un operateur
+    if TX^type /= nil then
+        nomTX := TX^type.getNom();
+        -- op arithmetique, alors les deux membres doivent etre de type entier
+        if nomTX.equals("int") then
+            if ~nomF.equals("int") then
+                error(MJAVA_exp_arith_invalide);
+            end
+            
+            -- Dans ce cas le resultat est un entier
+            T^type := new Type("int", 1);
+            T^affectable := false;
+        elseif nomTX.equals("bool") then
+            if ~nomF.equals("bool") then
+                error(MJAVA_exp_bool_invalide);
+            end
+            
+            -- Dans ce cas le resultat est un booleen
+            T^type := new Type("bool", 1);
+            T^affectable := false;  
+        else
+             error(MJAVA_exp_arith_invalide);
+        end
+    else
+        -- Sinon c'est celui de F
+        T^type := F^type;
+        T^affectable := F^affectable;
+    end
+end
+}
+#code {
+local
+    valeur : String;
+do
+    valeur := F^code;
+    -- S'il y a un operateur
+    if TX^type /= nil then
+        if F^affectable then
+            valeur := F^code @ T^machine.genChargValeurVar(1);
+        end
+    end
+    T^code := valeur @ TX^code;
+end
+}
+-- multiplication, ...
+TX ->   OPMUL F TX #type #code;
+#type {
+local
+    nomF : String;
+    nomTX1 : String;
+    nomOPMUL : String;
+do
+    -- S'il y a un operateur arithmetique, alors les deux membres doivent etre de type entier
+    nomOPMUL := OPMUL^type.getNom();
+    nomF := F^type.getNom();
+    if nomOPMUL.equals("int") then
+        if TX1^type /= nil then
+            nomTX1 := TX1^type.getNom();
+            if ~nomTX1.equals("int") then
+                error(MJAVA_exp_arith_invalide);
+            end
+        end
+        -- F doit etre de type entier
+        if ~nomF.equals("int") then
+            error(MJAVA_exp_arith_invalide);
+        end
+        -- Dans ce cas le resultat est un entier
+        TX^type := new Type("int", 1);
+    elseif nomOPMUL.equals("bool") then
+        if TX1^type /= nil then
+            nomTX1 := TX1^type.getNom();
+            if ~nomTX1.equals("bool") then
+                error(MJAVA_exp_bool_invalide);
+            end
+        end
+        -- F doit etre de type entier
+        if ~nomF.equals("bool") then
+            error(MJAVA_exp_arith_invalide);
+        end
+        -- Dans ce cas le resultat est un booleen
+        TX^type := new Type("bool", 1);
+    else
+        error(MJAVA_exp_arith_invalide);
+    end
+end
+}
+
+#code {
+local
+    valeur : String;
+do
+    valeur := F^code;
+    if F^affectable then
+       valeur := F^code @ TX^machine.genChargValeurVar(1);
+    end
+    TX^code := valeur @ OPMUL^code @ TX1^code;
+end
+}
+
+TX -> #type #code;
+#type {
+local
+do
+    TX^type := nil;
+end
+}
+
+#code {
+local
+do
+   TX^code := "";
+end
+}
+
+OPMUL -> mult #type #code;
+#type {
+local
+do
+    OPMUL^type := new Type("int", 1);
+end
+}
+
+#code {
+local
+do
+   OPMUL^code := OPMUL^machine.genMult();
+end
+}
+
+OPMUL -> div #type #code;
+#type {
+local
+do
+    OPMUL^type := new Type("int", 1);
+end
+}
+
+#code {
+local
+do
+   OPMUL^code := OPMUL^machine.genDiv();
+end
+}
+
+OPMUL -> mod #type #code;
+#type {
+local
+do
+    OPMUL^type := new Type("int", 1);
+end
+}
+
+#code {
+local
+do
+   OPMUL^code := OPMUL^machine.genMod();
+end
+}
+
+OPMUL -> et #type #code;
+#type {
+local
+do
+    OPMUL^type := new Type("bool", 1);
+end
+}
+
+#code {
+local
+do
+   OPMUL^code := OPMUL^machine.genEt();
+end
+}
+
+-- expressions de base
+F -> entier  #type #code;
+#type {
+local
+do
+    F^type := new Type("int", 1);
+    F^affectable := false;
+end
+}
+
+#code {
+local
+do
+   F^code := F^machine.genEntier(entier^txt);
+end
+}
+
+
+F -> vrai  #type #code;
+#type {
+local
+do
+    F^type := new Type("bool", 1);
+    F^affectable := false;
+end
+}
+
+#code {
+local
+do
+   F^code := F^machine.genBool(true);
+end
+}
+
+F -> faux  #type #code; 
+#type {
+local
+do
+    F^type := new Type("bool", 1);
+    F^affectable := false;
+end
+}
+#code {
+local
+do
+   F^code := F^machine.genBool(false);
+end
+}
+
+-- unaire
+F ->  OPUN F #type #code;
+#type {
+local
+    nomF1 : String;
+    nomOPUN : String;
+do
+    nomOPUN := OPUN^type.getNom();
+    nomF1 := F1^type.getNom();
+    -- s'il s'agit d'un operateur sur les entiers
+    if nomOPUN.equals("int") then
+        if ~nomF1.equals("int") then
+            error(MJAVA_exp_unaire_invalide);
+        end 
+        F^type := new Type("int", 1);
+    elseif nomOPUN.equals("bool") then
+        if ~nomF1.equals("bool") then
+            error(MJAVA_exp_bool_invalide);
+        end 
+        F^type := new Type("bool", 1);   
+    end
+    F^affectable := false;
+end
+}
+
+#code {
+local
+    valeur : String;
+do
+    valeur := F1^code;
+    if F1^affectable then
+       valeur := F1^code @ F^machine.genChargValeurVar(1);
+    end
+    F^code := valeur @ OPUN^code;
+end
+}
+
+OPUN -> plus #type #code;
+#type {
+local
+do
+    OPUN^type := new Type("int", 1);
+end
+}
+
+#code {
+local
+do
+   OPUN^code := "";
+end
+}
+
+OPUN -> moins #type #code;
+#type {
+local
+do
+    OPUN^type := new Type("int", 1);
+end
+}
+
+#code {
+local
+do
+   OPUN^code := OPUN^machine.genNeg();
+end
+}
+
+OPUN -> non #type #code;
+#type {
+local
+do
+    OPUN^type := new Type("bool", 1);
+end
+}
+
+#code {
+local
+do
+   OPUN^code := OPUN^machine.genNon();
+end
+}
+-- null
+F -> null  #type #code;
+#type {
+local
+do
+    F^type := new Type("null", 0);
+    F^affectable := false;
+end
+}
+
+#code {
+local
+do
+   F^code := F^machine.genNullPointeur();
+end
+}
+
+F ->  paro E parf #type #code;
+#type {
+
+local
+do
+    F^type := E^type;
+    F^affectable := false;
+end
+}
+
+#code {
+local
+do
+   F^code := E^code;
+end
+}
+
+-- new
+F -> nouveau TYPE paro #type #visibilite ARGS parf #code;
+global
+    constructeur : InfoMethode;
+
+#type{
+local
+    test : Iterator;
+    params : TDS;
+do
+    -- on verifie que le type est bien de type InfoClasse
+    match TYPE^type 
+    with InfoClasse then
+        -- On peut poursuivre
+        -- On verifie que les parametres sont correctes
+        constructeur := TYPE^type.getConstructeur();
+        -- on verifie s'il y a bien un constructeur par defaut
+        if constructeur /= nil then
+            ARGS^params := constructeur.getIteratorParamsEtVars();
+            test := constructeur.getIteratorParamsEtVars();
+            params := constructeur.getTableParametres();
+        else
+            -- Sinon on place l'iterateur sur les parametres a nil
+            ARGS^params := nil;
+        end
+        F^type := TYPE^type;
+        F^affectable := false;
+    else
+        error(MJAVA_type_invalide, TYPE^type.getNom());
+    end
+end
+}
+
+#visibilite {
+local
+    nom_classe_courante : String;
+do
+    -- Si on appelle une methode privee dans une autre classe que celle contenant
+    -- la methode privee, on signale une erreur de visibilite.
+    if ~constructeur.estPublic() then
+        nom_classe_courante := F^classe_courante.getNom();
+        if ~nom_classe_courante.equals(TYPE^type.getNom()) then
+            error(MJAVA_visibilite_constructeur, constructeur.getNom());
+        end
+    end
+end
+}
+
+#code{
+do
+    F^code := F^machine.genAppelConstructeur(TYPE^type.getNom(), ARGS^code);
+end
+}
+
+-- acces variable ou methode 
+F ->  ident #typeh #visibilite #codeh Q #type #code;
+global 
+    tablem : TDS<InfoMethode>;
+    var : InfoVar;
+    met : InfoMethode;
+    type : Type;
+#typeh {
+do    
+    -- On recherche s'il existe une variable du meme nom que l'ident.
+    var := F^tdv.chercherGlobalement(ident^txt);
+    
+    
+    -- On recherche s'il existe une methode du meme nom que l'ident
+    tablem := F^classe_courante.getTableMethodes();
+    met := tablem.chercherGlobalement(ident^txt);
+
+    type := nil;
+    if var /= nil then
+        type := var.getType();
+    end
+
+    if met = nil & type = nil then
+        error(MJAVA_ident_introuvable, ident^txt);
+    end
+
+    -- On indique le nom de la variable ou de la methode concernee
+    Q^identh := ident^txt;
+    Q^methodeh := met;
+    Q^typeh := type;
+    Q^est_local := true;
+    Q^estAttribut := true;
+end
+} 
+
+#visibilite {
+local
+    nom_classe_courante : String;
+    classe_contenante : InfoClasse;
+do
+    -- methode
+    if met /= nil then
+	    -- Si on appelle une methode privee dans une autre classe que celle contenant
+	    -- la methode privee, on signale une erreur de visibilite.
+	    if ~met.estPublic() then
+	        nom_classe_courante := F^classe_courante.getNom();
+            classe_contenante := met.getClasseContenante();
+	        if ~nom_classe_courante.equals(classe_contenante.getNom()) then
+	            error(MJAVA_visibilite_methode, met.getNom(), classe_contenante.getNom());
+	        end
+	    end
+    -- attribut
+    else
+        -- Si on appelle un attribut prive dans une autre classe que celle contenant
+        -- l'attribut prive, on signale une erreur de visibilite.
+        match var with InfoAttribut then
+	        if ~var.estPublic() then
+	            nom_classe_courante := F^classe_courante.getNom();
+	            classe_contenante := var.getClasseContenante();
+	            if ~nom_classe_courante.equals(classe_contenante.getNom()) then
+	                error(MJAVA_visibilite_attribut, var.getNom(), classe_contenante.getNom());
+	            end
+	        end
+        end
+    end
+end
+}
+
+#type{
+local
+do
+    -- le type est celui calcule par la regle Q1
+    F^type := Q^type;
+    F^affectable := Q^affectable;
+end
+}
+
+#codeh{
+local
+do
+    -- on regarde s'il l'ident peut representer une variable
+    Q^code_variable := "";
+    Q^codeh := "";
+    Q^code_methode := "";
+    if var /= nil then
+
+        -- alors on charge son code pour le passer a la regle fille
+        Q^code_variable := F^machine.genAppelVariable(var, true, F^methode_courante);
+    end
+end
+}
+
+#code{
+do
+    F^code := Q^code;
+end
+}
+
+-- Q = qualificateur de variable
+Q ->  #type #code;
+#type {
+local
+do
+    Q^type := Q^typeh;
+    
+    -- S'il s'agit d'une methode, la methode renvoie soit une valeur soit une adresse, non affectables
+    if ~Q^estAttribut then
+	    Q^affectable := false;
+    else
+        -- S'il s'agit d'une variable, Q est affectable
+        Q^affectable := true;
+    end
+end
+}
+#code{
+do
+    Q^code := "";
+    if (Q^code_variable.equals("")) then
+        Q^code := Q^codeh @ Q^code_methode; 
+    else
+        Q^code := Q^codeh @ Q^code_variable; 
+    end
+end
+}
+
+-- acces attribut
+Q ->  pt ident #typeh #visibilite #codeh Q #type #code;
+global 
+    tablev : TDS<InfoAttribut>;
+    tablem : TDS<InfoMethode>;
+    var : InfoVar;
+    met : InfoMethode;
+    type : Type;
+#typeh {
+do
+    -- On verifie que le type herite est bien un InfoClasse
+    match Q^typeh with
+        InfoClasse then
+        
+        -- On recherche s'il existe une variable du meme nom que l'ident
+        tablev := Q^typeh.getTableAttributs();
+        var := tablev.chercherGlobalement(ident^txt);
+        
+        -- On recherche s'il existe une methode du meme nom que l'ident
+        tablem := Q^typeh.getTableMethodes();
+        met := tablem.chercherGlobalement(ident^txt);
+    
+        type := nil;
+        if var /= nil then
+            type := var.getType();
+        end
+    
+        if met = nil & type = nil then
+            error(MJAVA_ident_introuvable, ident^txt);
+        end
+    
+        -- On indique le nom de la variable ou de la methode concernee
+        Q1^identh := ident^txt;
+        Q1^methodeh := met;
+        Q1^typeh := type;
+        Q1^est_local := false;
+        Q1^estAttribut := true;
+        
+        else
+            error(MJAVA_acces_attribut_primitif, Q^typeh.getNom());
+     end
+end
+}
+
+#visibilite {
+local
+    nom_classe_courante : String;
+    classe_contenante : InfoClasse;
+do
+    -- methode
+    if met /= nil then
+        -- Si on appelle une methode privee dans une autre classe que celle contenant
+        -- la methode privee, on signale une erreur de visibilite.
+        if ~met.estPublic() then
+            nom_classe_courante := Q^classe_courante.getNom();
+            classe_contenante := met.getClasseContenante();
+            if ~nom_classe_courante.equals(classe_contenante.getNom()) then
+                error(MJAVA_visibilite_methode, met.getNom(), classe_contenante.getNom());
+            end
+        end
+    -- attribut
+    else
+        -- Si on appelle un attribut prive dans une autre classe que celle contenant
+        -- l'attribut prive, on signale une erreur de visibilite.
+        match var with InfoAttribut then
+            if ~var.estPublic() then
+                nom_classe_courante := Q^classe_courante.getNom();
+                classe_contenante := var.getClasseContenante();
+                if ~nom_classe_courante.equals(classe_contenante.getNom()) then
+                    error(MJAVA_visibilite_attribut, var.getNom(), classe_contenante.getNom());
+                end
+            end
+        end
+    end
+end
+}
+
+#type{
+local
+do
+    -- le type est celui calcule par la regle Q1
+    Q^type := Q1^type;
+    Q^affectable := Q1^affectable;
+end
+}
+
+#codeh{
+local
+do
+    Q1^code_variable := "";
+    Q1^codeh := "";
+    Q1^code_methode := "";
+    
+    -- si on a une methode
+    if (Q^code_variable.equals("")) then
+                
+                Q1^codeh := Q^codeh @ Q^code_methode; 
+        else
+                -- Dans codeh se trouve l'adresse de la variable qui contient l'adresse de l'objet
+                -- on doit charger l'adresse de l'objet via la methode genChargValeurVar
+                Q1^codeh := Q^codeh @ Q^code_variable @ Q^machine.genChargValeurVar(1); 
+    end
+    
+    if var /= nil then
+        -- alors on charge son code pour le passer a la regle fille
+        Q1^code_variable := Q^machine.genAppelVariable(var, false, Q^methode_courante);
+    end
+end
+}
+
+#code{
+do
+    Q^code := Q1^code;
+end
+}
+
+-- arguments d'appel de methode
+Q ->  paro #typeh ARGS parf #codeh Q #type #code;
+#typeh {
+local 
+do
+    -- on fait appel a une methode
+    -- on verifie que la methode invoquee existe bien
+            
+    if Q^methodeh = nil then
+            error(MJAVA_methode_inconnue, Q^identh);
+    end
+    
+    -- On verifie que les parametres sont correctes
+    ARGS^params := Q^methodeh.getIteratorParamsEtVars();  
+    
+    Q1^identh := "";
+    Q1^methodeh := nil;
+    Q1^typeh := Q^methodeh.getTypeRetour();
+    Q1^est_local := Q^est_local;
+    Q1^estAttribut := false;
+end
+}
+
+#type{
+local
+do
+    -- le type est celui calcule par la regle Q1
+    Q^type := Q1^type;
+    Q^affectable := Q1^affectable;
+end
+}
+
+#codeh{
+local
+do
+    Q1^code_variable := "";
+    Q1^codeh := Q^codeh;
+    Q1^code_methode := Q^machine.genAppelMethode(Q^methodeh, ARGS^code, Q^est_local, Q^methode_courante);
+end
+}
+
+#code{
+do
+    Q^code := Q1^code;
+end
+}
+
+ARGS ->  E #type ARGSX #code;
+#type {
+local 
+    i : InfoVar;
+    t : Type;
+    hasNext : Boolean;
+do
+    -- on doit verifier le type
+    -- on verifie si on a un constructeur
+    if ARGS^params = nil then
+        error(MJAVA_methode_nb_params2);
+    end
+        
+    hasNext := ARGS^params.hasNext(); 
+    
+    -- on verifie qu'il y a bien un parametre 
+    if ~hasNext then
+        
+        error(MJAVA_methode_nb_params2);
+    end
+    
+    i := ARGS^params.next();
+    t := i.getType();
+    if ~t.isCompatible(E^type) then
+        error(MJAVA_methode_param_incor, t.getNom(), E^type.getNom());
+    end 
+    
+    ARGSX^params := ARGS^params;
+end
+}
+
+#code{
+local
+    valeur : String;
+do
+    -- Remarque : les parametres sont empiles de gauche a droite
+     valeur := E^code;
+     if E^affectable then
+        valeur := E^code @ ARGS^machine.genChargValeurVar(1) ;
+     end
+     ARGS^code := valeur @ ARGSX^code;
+end
+}
+ARGS -> #type #code;
+#type {
+local 
+    hasNext : Boolean;
+do
+    hasNext := false;
+    -- on doit verifier le type
+    -- on verifie qu'il y a un constructeur
+    if ARGS^params /= nil then
+        hasNext := ARGS^params.hasNext(); 
+    end
+    
+    -- on verifie qu'il n'y a plus aucun parametre
+    if hasNext then
+        error(MJAVA_methode_nb_params1);
+    end
+end
+}
+
+#code{
+do
+    ARGS^code := "";
+end
+}
+
+ARGSX ->   virg E #type ARGSX #code;
+#type {
+local 
+    i : InfoVar;
+    t : Type;
+    hasNext : Boolean;
+do
+    -- on doit verifier le type
+    hasNext := ARGSX^params.hasNext(); 
+    
+    -- on verifie qu'il y a bien un parametre 
+    if ~hasNext then
+        -- l'appel possede trop de parametres
+        error(MJAVA_methode_nb_params2);
+    end
+    
+    i := ARGSX^params.next();
+    t := i.getType();
+    if ~t.isCompatible(E^type) then
+        error(MJAVA_methode_param_incor, t.getNom(), E^type.getNom());
+    end 
+    
+    ARGSX1^params := ARGSX^params; 
+end
+}
+
+#code{
+do
+    ARGSX^code := E^code @ ARGSX1^code;
+end
+}
+
+ARGSX -> #type #code;
+#type {
+local 
+    hasNext : Boolean;
+do
+    -- on doit verifier le type
+    hasNext := ARGSX^params.hasNext(); 
+    
+    -- on verifie qu'il n'y a plus aucun parametre
+    if hasNext then
+        error(MJAVA_methode_nb_params1);
+    end
+end
+}
+
+#code{
+do
+    ARGSX^code := "";
+end
+}
+
+end

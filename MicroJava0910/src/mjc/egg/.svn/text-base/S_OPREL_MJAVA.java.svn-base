@@ -1,0 +1,159 @@
+package mjc.egg;
+import mjc.compiler.*;
+import mjc.gc.*;
+import mjc.tds.*;
+import mjc.type.*;
+import java.util.Iterator;
+import java.io.File;
+import mg.egg.eggc.compiler.libjava.lex.*;
+import mg.egg.eggc.compiler.libjava.messages.*;
+import mg.egg.eggc.compiler.libjava.*;
+import mg.egg.eggc.compiler.libjava.problem.IProblem;
+import java.util.Vector;
+public class S_OPREL_MJAVA {
+LEX_MJAVA scanner;
+  S_OPREL_MJAVA() {
+    }
+  S_OPREL_MJAVA(LEX_MJAVA scanner) {
+    this.scanner = scanner;
+    this.att_scanner = scanner;
+    }
+int [] sync= new int[0];
+  String att_op;
+  String att_code;
+  AbstractMachine att_machine;
+  LEX_MJAVA att_scanner;
+  private void regle44() throws Exception {
+
+    //declaration
+    T_MJAVA x_2 = new T_MJAVA(scanner ) ;
+    //appel
+    x_2.analyser(LEX_MJAVA.token_eg);
+      action_code_44();
+  }
+  private void regle45() throws Exception {
+
+    //declaration
+    T_MJAVA x_2 = new T_MJAVA(scanner ) ;
+    //appel
+    x_2.analyser(LEX_MJAVA.token_neg);
+      action_code_45();
+  }
+  private void regle40() throws Exception {
+
+    //declaration
+    T_MJAVA x_2 = new T_MJAVA(scanner ) ;
+    //appel
+    x_2.analyser(LEX_MJAVA.token_inf);
+      action_code_40();
+  }
+  private void regle41() throws Exception {
+
+    //declaration
+    T_MJAVA x_2 = new T_MJAVA(scanner ) ;
+    //appel
+    x_2.analyser(LEX_MJAVA.token_infeg);
+      action_code_41();
+  }
+  private void regle42() throws Exception {
+
+    //declaration
+    T_MJAVA x_2 = new T_MJAVA(scanner ) ;
+    //appel
+    x_2.analyser(LEX_MJAVA.token_sup);
+      action_code_42();
+  }
+  private void regle43() throws Exception {
+
+    //declaration
+    T_MJAVA x_2 = new T_MJAVA(scanner ) ;
+    //appel
+    x_2.analyser(LEX_MJAVA.token_supeg);
+      action_code_43();
+  }
+private void action_code_41() throws Exception {
+try {
+// locales
+// instructions
+this.att_op="infeg";
+this.att_code=this.att_machine.genInfEg();
+}catch(RuntimeException e) {		//e.printStackTrace();
+       scanner._interrompre(IProblem.Internal, scanner.getBeginLine(), ICoreMessages.id_EGG_runtime_error, CoreMessages.EGG_runtime_error,e.getStackTrace());
+	}
+  }
+private void action_code_40() throws Exception {
+try {
+// locales
+// instructions
+this.att_op="inf";
+this.att_code=this.att_machine.genInf();
+}catch(RuntimeException e) {		//e.printStackTrace();
+       scanner._interrompre(IProblem.Internal, scanner.getBeginLine(), ICoreMessages.id_EGG_runtime_error, CoreMessages.EGG_runtime_error,e.getStackTrace());
+	}
+  }
+private void action_code_44() throws Exception {
+try {
+// locales
+// instructions
+this.att_op="eg";
+this.att_code=this.att_machine.genEq();
+}catch(RuntimeException e) {		//e.printStackTrace();
+       scanner._interrompre(IProblem.Internal, scanner.getBeginLine(), ICoreMessages.id_EGG_runtime_error, CoreMessages.EGG_runtime_error,e.getStackTrace());
+	}
+  }
+private void action_code_45() throws Exception {
+try {
+// locales
+// instructions
+this.att_op="neg";
+this.att_code=this.att_machine.genNeq();
+}catch(RuntimeException e) {		//e.printStackTrace();
+       scanner._interrompre(IProblem.Internal, scanner.getBeginLine(), ICoreMessages.id_EGG_runtime_error, CoreMessages.EGG_runtime_error,e.getStackTrace());
+	}
+  }
+private void action_code_42() throws Exception {
+try {
+// locales
+// instructions
+this.att_op="sup";
+this.att_code=this.att_machine.genSup();
+}catch(RuntimeException e) {		//e.printStackTrace();
+       scanner._interrompre(IProblem.Internal, scanner.getBeginLine(), ICoreMessages.id_EGG_runtime_error, CoreMessages.EGG_runtime_error,e.getStackTrace());
+	}
+  }
+private void action_code_43() throws Exception {
+try {
+// locales
+// instructions
+this.att_op="supeg";
+this.att_code=this.att_machine.genSupEg();
+}catch(RuntimeException e) {		//e.printStackTrace();
+       scanner._interrompre(IProblem.Internal, scanner.getBeginLine(), ICoreMessages.id_EGG_runtime_error, CoreMessages.EGG_runtime_error,e.getStackTrace());
+	}
+  }
+  public void analyser () throws Exception {
+    scanner.lit ( 1 ) ;
+    switch ( scanner.fenetre[0].code ) {
+      case LEX_MJAVA.token_inf : // 1213
+        regle40 () ;
+      break ;
+      case LEX_MJAVA.token_infeg : // 1214
+        regle41 () ;
+      break ;
+      case LEX_MJAVA.token_sup : // 1215
+        regle42 () ;
+      break ;
+      case LEX_MJAVA.token_supeg : // 1216
+        regle43 () ;
+      break ;
+      case LEX_MJAVA.token_eg : // 1217
+        regle44 () ;
+      break ;
+      case LEX_MJAVA.token_neg : // 1218
+        regle45 () ;
+      break ;
+      default :
+               scanner._interrompre(IProblem.Syntax, scanner.getBeginLine(), IMJAVAMessages.id_MJAVA_unexpected_token,MJAVAMessages.MJAVA_unexpected_token,new String[]{scanner.fenetre[0].getNom()});
+    }
+  }
+  }

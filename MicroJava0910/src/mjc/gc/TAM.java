@@ -1,0 +1,421 @@
+package mjc.gc;
+
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Stack;
+
+import mjc.tds.DEBUG;
+import mjc.tds.InfoAttribut;
+import mjc.tds.InfoClasse;
+import mjc.tds.InfoMethode;
+import mjc.tds.InfoVar;
+import mjc.tds.TDS;
+import mjc.tds.Type;
+
+public class TAM extends AbstractMachine {
+
+	public String getSuffixe() {
+		return "tam";
+	}
+	
+	// genere le code pour une declaration (avec initialisation)
+	public String genDecl(Type t, String nomVar, String ini) {
+		
+		String code = DEBUG.trace("DECL DE " + nomVar);
+
+		// On verifie s'il y a une initialisation ou non.
+		// S'il y a une initialisation, on ne charge que le code de l'initialisation
+		// Au lieu de faire PUSH + CODE + STORE, on ne fait donc que CODE afin d'optimiser le tout.
+		if(!ini.equals("")){
+			code += ini;
+		}
+		else{
+			code += "\tLOADL 0\n";
+		}
+		
+		return code;
+	}
+	
+	public String genNullPointeur(){
+		return "\tLOADL 0\n";
+	}
+	
+	public String genCodeClasses(TDS<InfoClasse> classes){
+		String code="";
+		for (Iterator<InfoClasse> iterator = classes.values().iterator(); iterator.hasNext();) {
+			code += iterator.next().getCode();
+		}
+		return code;
+	}
+	
+	public String genTableVirtuelles (TDS<InfoClasse> c) {
+		String code = "\t;TABLES DES VIRTUELLES\n" ;
+		InfoClasse classe;
+		
+		for (Iterator<InfoClasse> iterator = c.values().iterator(); iterator.hasNext();) {
+			classe = iterator.next();
+			code += genTVClasse(classe);
+			if(classe.getTableMethodes().chercherLocalement("main")!=null){
+				// Si la classe possede un main, alors le programme doit executer ce main apres avoir charge la table virtuelle
+				code += "\t;INVOCATION DU MAIN DE " + classe.getNom() + "\n";
+				code += "\tLOADL 0\n\tLOADL 0\n\tLOADA _"+classe.getNom()+"_main\n"+"\tCALLI\n";
+			}
+		}
+		return code ;
+	}
+	
+	private String genTVClasse(InfoClasse c){	
+		// Contiendra le code qui charge la TV de la classe
+		String code = "\t;TABLE DES VIRTUELLES DE " + c.getNom() + "\n" ; 
+		// Contiendra toutes les methodes accessibles par la classe (peut contenir des methodes des super classes)
+		// Le premier but est de remplir cette map
+		LinkedHashMap<String, InfoMethode> methodes = new LinkedHashMap<String, InfoMethode>();
+		
+		// La pile contient toutes les classes a traiter
+		// les classes sont enregistrees selon leur hierarchie
+		// On traite le probleme du haut vers le bas.
+		Stack<InfoClasse> pile = new Stack<InfoClasse>();
+		pile.push(c);
+		// On rempli la pile
+		while(pile.peek().getParente()!= null) pile.push(pile.peek().getParente());
+		
+		// On traite la pile tant qu'elle n'est pas vide
+		while(!pile.empty()){
+			// on doit parcourir toutes les methodes de la classe en haut de la pile
+			for (Iterator<InfoMethode> iterator = pile.peek().getTableMethodes().values().iterator(); iterator.hasNext();) {
+				InfoMethode m = iterator.next();
+				
+				// On traite la methode si elle est publique
+				if(m.estPublic()){
+					// On regarde si la methode a deja ete traitee
+					if(methodes.get(m.getNom())==null){
+						// Si la methode n'a pas deja ete traite, on s'en occupe
+						// On effectue une recherche globale depuis la racine pour obtenir la methode de plus bas niveau
+						m = c.getTableMethodes().chercherGlobalement(m.getNom());
+						// On enregistre cette methode dans la map
+						methodes.put(m.getNom(), m);
+					}
+				}
+			}
+			pile.pop();
+		}
+		
+		// Une fois que la map des methodes est complete, il suffit de la parcourir pour construire le code 
+		// de la table des virtuelles
+		
+		for (Iterator<InfoMethode> iterator = methodes.values().iterator(); iterator.hasNext();) {
+			InfoMethode m = iterator.next();
+			code += "\tLOADA _" + m.getClasseContenante().getNom() + "_" + m.getNom() + "\n";	
+		}
+		// On place les methodes privees apres les methodes publiques
+		return code;
+	}
+
+	public String genBloc(String code, int taille){
+		
+		return DEBUG.trace("DEBUT BLOC") + code + "\tPOP(0) " + taille +"\n" + DEBUG.trace("FIN BLOC");
+	}
+
+	public String genIf(String code, String code2, String code3) {
+		String sinon = "else_"+genEtiq();
+		String fin = "end_"+genEtiq();
+		return "\t;IF\n" + code + "\tJUMPIF(0) " + sinon + "\n" + code2
+				 + "\tJUMP " + fin + "\n" + sinon + "\n" + code3
+				+ fin + "\n" + "\t;FIN IF\n";
+	}
+	
+	public String genWhile(String cond, String bloc){
+        String etiq = genEtiq();
+        String label_debut = "while_debut__" + etiq;
+        String label_fin = "while_fin__" + etiq;
+        return label_debut + " " + cond + " JUMPIF (0) " + label_fin + "\n"
+        + bloc + "\n"
+        + "JUMP " + label_debut + "\n"
+        + label_fin + "\n";
+	}
+	
+	public String genAffectation(String gauche, String droite){
+		
+		String code = "";
+		
+		// On verifie qu'il y a une partie droite
+		if(droite.equals("")){
+			// S'il n'y a pas de partie droite, il n'y a pas d'affectation
+			// Le code est donc celui de la partie gauche
+			code += gauche;
+		}
+		else{
+			code = DEBUG.trace("AFFECTATION DEBUT");
+			// Il y a une affectation
+			// On a besoin de la valeur de la partie droite
+			code += DEBUG.trace("AFFECTATION PARTIE DROITE");
+			code += droite;
+			// On a besoin de l'adresse qui contiendra le resultat de l'affectation
+			// Cette adresse est placee en sommet de pile par la partie gauche
+			code += DEBUG.trace("AFFECTATION PARTIE GAUCHE");
+			code += gauche;
+			// On effectue l'affectation. La taille est de 1, car la pile ne contient que des types
+			// primitifs
+			code += DEBUG.trace("AFFECTATION GAUCHE <- DROITE");
+			code += "\tSTOREI (1)\n";
+			code += DEBUG.trace("AFFECTATION FIN");
+		}
+		return code;
+	}
+
+	
+	public String genRetour(InfoMethode m){
+		
+		int tailleRetour = m.getTypeRetour().getTaille();
+		// le +1 correspond a la case memoire qui contient un pointeur sur l'objet courant
+		return "\tRETURN (" + tailleRetour +") " + (m.getTableParametres().size()+1) + "\n";
+		
+	}
+	
+	public String genChargValeurVar(int taille){
+		
+		return DEBUG.trace("ON CHARGE LA VALEUR DE LA VARIABLE") + "\tLOADI ("+taille+")\n";
+	}
+	
+	public String genInf(){
+		return "\tSUBR ILss\n";
+	}
+	
+	public String genInfEg(){
+		return "\tSUBR ILeq\n";
+	}
+	
+	public String genSup(){
+		return "\tSUBR IGtr\n";
+	}
+	
+	public String genSupEg(){
+		return "\tSUBR IGeq\n";
+	}
+	
+	public String genEq(){
+		return "\tSUBR IEq\n";
+	}
+	
+	public String genNeq(){
+		return "\tSUBR INeq\n";
+	}
+	
+	public String genPlus(){
+		return "\tSUBR IAdd\n";
+	}
+	
+	public String genMoins(){
+		return "\tSUBR ISub\n";
+	}
+	
+	public String genOu(){
+		return "\tSUBR BOr\n";
+	}
+	
+	public String genMult(){
+		return "\tSUBR IMul\n";
+	}
+
+	public String genDiv(){
+		return "\tSUBR IDiv\n";
+	}
+	
+	public String genMod(){
+		return "\tSUBR IMod\n";
+	}
+	
+	public String genEt(){
+		return "\tSUBR BAnd\n";
+	}
+	
+	public String genEntier(String e){
+		return "\tLOADL " + e + "\n";
+	}
+	
+	public String genBool(boolean b){
+		return b ? "\tLOADL 1\n" : "\tLOADL 0\n";
+	}
+	
+	public String genNeg(){
+		return "\tSUBR INeg\n";
+	}
+	
+	public String genNon(){
+		return "\tSUBR BNeg\n";
+	}
+	
+	public String genAppelVariable(InfoVar variable, boolean locale, InfoMethode contenante){
+		String code = "";
+		
+		// On regarde s'il s'agit d'une variable locale ou d'un attribut d'instance
+		if (variable instanceof InfoAttribut){
+			// On accede a un attribut
+			// Si on accede a un attibut de la classe locale
+			if(locale){
+				// On doit d'abord charger un pointeur sur l'objet courant
+				if(contenante.getNom().equals("main")){
+					// S'il s'agit du main, on se trouve dans un environnement static, il n y a aucun environnement courant
+					// On n'est pas cense etre autoriser a utiliser des attributs locaux lorsqu'on est dans le main..
+					code += DEBUG.trace("CHARGEMENT OBJET COURANT NUL DEBUT");
+					code += "\tLOADL 0\n";
+					code += DEBUG.trace("CHARGEMENT OBJET COURANT NUL FIN");
+				}else{
+					code += DEBUG.trace("CHARGEMENT OBJET COURANT DEBUT");
+					code += "\tLOAD(1) -" + (contenante.getTableParametres().size()+1) +"[LB]\n";
+					code += DEBUG.trace("CHARGEMENT OBJET COURANT FIN");
+				}
+			}
+			// Le dernier element de la pile est normalemet un pointeur sur la zone memoire de l'objet dans le tas
+			// il faut incrementer ce pointeur avec le deplacement de l'attribut, puis charger celui-ci dans la pile
+			code += DEBUG.trace("APPEL DE L'ATTRIBUT " + variable.getNom());
+			code += "\tLOADL " + variable.getDeplacement() + "\n\tSUBR IAdd\n";
+		}
+		else{
+			// Il s'agit d'une variable locale. Deplacement par rapport a LB
+			code += DEBUG.trace("APPEL DE LA VARIABLE " + variable.getNom());
+			code += "\tLOADA " + variable.getDeplacement() + "[LB]\n" ;
+		}
+		
+		return code;
+	}
+	
+	public String genCodeMethode(InfoMethode m, String codem, InfoClasse c){
+		String code;
+		// On place l'etiquette
+		code = "_" + c.getNom() + "_" + m.getNom() + "\n";
+		// Puis on ajoute le code du constructeur
+		code += codem;
+		
+		// Si la methode est un main
+		if(m.getNom().equals("main")){
+			// Alors sa terminaison correspond avec la terminaison du programme
+			code += "\tHALT\n";
+		}
+		else if(m.getTypeRetour().getNom().equals("null")){
+			// On execute le code du return
+			// Celui-ci depilera les parametres et les variables locales.
+			// le +1 correspond a la case memoire qui contient un pointeur sur l'objet courant
+			code += "\tRETURN (" + 0 + ") " + (m.getTableParametres().size()+1) + "\n";
+		}
+
+
+		return code;
+	}
+	
+	public String genAppelMethode(InfoMethode m, String args, boolean locale, InfoMethode contenante){
+		
+		String code = "";
+		code += DEBUG.trace("APPEL DE LA METHODE " + m.getNom());
+		// On regarde s'il s'agit d'une methode locale
+		if(locale){
+			// On doit d'abord charger un pointeur sur l'objet courant
+			if(contenante.getNom().equals("main")){
+				// S'il s'agit du main, on se trouve dans un environnement static, il n y a aucun environnement courant
+				code += DEBUG.trace("CHARGEMENT OBJET COURANT NUL DEBUT");
+				code += "\tLOADL 0\n";
+				code += DEBUG.trace("CHARGEMENT OBJET COURANT NUL FIN");
+			}else{
+				code += DEBUG.trace("CHARGEMENT OBJET COURANT DEBUT");
+				code += "\tLOAD(1) -" + (contenante.getTableParametres().size()+1) +"[LB]\n";
+				code += DEBUG.trace("CHARGEMENT OBJET COURANT FIN");
+			}
+				code += DEBUG.trace("CHARGEMENT DES PARAMS DEBUT");
+				code += args;
+				code += DEBUG.trace("CHARGEMENT DES PARAMS FIN");
+				// On charge le 0 necessaire a un CALLI
+				code += "\tLOADL 0\n";
+				// On obtient directement l'adresse de la methode grace a son etiquette
+				code += DEBUG.trace("CHARGEMENT ADRESSE METHODE DEBUT");
+				code += "\tLOADA _" + m.getClasseContenante().getNom() + "_" + m.getNom() +"\n"; 
+				code += DEBUG.trace("CHARGEMENT ADRESSE METHODE FIN");
+		}
+		else{
+			// On commence par charger les parametres
+			code += DEBUG.trace("CHARGEMENT DES PARAMS DEBUT");
+			code += args;
+			code += DEBUG.trace("CHARGEMENT DES PARAMS FIN");
+			// On charge le 0 necessaire a un CALLI
+			code += "\tLOADL 0\n";
+			// On doit rechercher l'adresse de la methode dans la table des virtuelles
+			// On doit rechercher où se trouve la table des virtuelles de la classe
+			// Si p est un pointeur sur la zone memoire de l'objet dans le tas, alors
+			// l'adresse de la table virtuelle se trouve à l'adresse pointee par p.
+			// Lorsqu'une methode est appelee, ce p ce trouve normalement en sommet de pile (sauf s'il s'agit d'une methode locale).
+			// On a place les arguments au dessus de ce pointeur
+			// On charge donc le pointeur en sommet de pile
+			// -(m.getTableParametres().size()+2)[ST] donne l'adresse dans la pile de p
+			// +1 pour le LOADL 0
+			code += DEBUG.trace("CHARGEMENT TV DEBUT");
+			code += "\tLOAD (1) -" + (contenante.getTableParametres().size()+2) + "[ST]\n";  
+			code += "\tLOADI (1)\n";
+			code += DEBUG.trace("CHARGEMENT TV FIN");
+		
+			// on possede desormais un pointeur t sur la table des virtuelles
+			// La methode se trouve a l'adresse t + deplacement de la methode
+			// On charge le decalage
+			code += DEBUG.trace("CHARGEMENT ADRESSE METHODE DEBUT");
+			code += "\tLOADL " + m.getDeplacement() + "\n";
+			// On effectue l'addition
+			code += "\tSUBR IAdd\n";
+			// Au sommet de la pile se trouve maintenant l'adresse de la case qui contient l'adresse de la methode
+			// On charge donc l'adresse de la methode
+			code += "\tLOADI (1)\n";
+			code += DEBUG.trace("CHARGEMENT ADRESSE METHODE FIN");
+		}
+		// On possede l'adresse de la methode, et ses arguments.
+		// On peut effectuer l'invocation
+		code += "\tCALLI\n";
+		code += DEBUG.trace("FIN APPEL DE LA METHODE " + m.getNom());
+		return code;
+	}
+	
+	public String genCodeConstructeur(InfoMethode m, String codem, InfoClasse c){
+		String code;
+
+		// On place l'etiquette
+		code = "_" + c.getNom() + "_" + c.getNom() + "\n";
+		code += DEBUG.trace("INITIALISATION INSTANCE");
+		// on charge d'abord l'adresse de la table des virtuelles
+		code += "\tLOADA " + m.getClasseContenante().getDeplTV() + "[SB]\n"; 
+		
+		// On doit ensuite creer une zone memoire dans le tas
+		// On charge la taille de la classe, +1 (pour l'adresse de la table des virtuelles)
+		code += "\tLOADL " + (c.getTaille()+1) +"\n";
+		// On reserve cette zone memoire dans le tas
+		code += "\tSUBR MAlloc\n";
+		// On sauvegrade cette valeur dans une case cree specialement lors de l'appel du constructeur
+		// Elle se trouve avant les parametres
+		// On en aura besoin dans la suite donc on la duplique
+		code += "\tLOAD(1) 4[LB]\n";
+		code += "\tSTORE (1) -" + (1+m.getTableParametres().size()) + "[LB]\n";
+		
+		// l'adresse p de l'objet se trouve en haut de la pile
+		// on place l'adresse de la table des virtuelles de la classe à l'adresse 0 de la zone memoire de l'objet (represente par p)
+		code += "\tSTOREI (1)\n";
+		
+		// Puis on ajoute le code du constructeur
+		code += DEBUG.trace("CODE CONSTRUCTEUR");
+		code += codem;
+		
+		// On execute le code du return
+		// Celui-ci depilera les parametres et les variables locales.
+		// L'adresse en memoire de l'objet se retrouvera donc au sommet de la pile
+		code += "\tRETURN (0) " + m.getTableParametres().size() + "\n";
+		
+		return code;
+	}
+	
+	public String genAppelConstructeur(String nomType, String params){
+		// On rerve un espace memoire avant les params, celui-ci permettra de stocker l'adresse dans le tas de l'objet 
+		return DEBUG.trace("APPEL DU CONSTRUCTEUR " + nomType) + "\tPUSH 1\n" + params + "\tLOADL 0\n\tLOADA _" + nomType + "_" + nomType + "\n\tCALLI\n";
+	}
+	
+	// compteur pour le generateur d'etiquettes
+	private static int cpt = 0;
+
+	// genere une etiquette differente des autres
+	public String genEtiq() {
+		return "X" + cpt++;
+	}
+}

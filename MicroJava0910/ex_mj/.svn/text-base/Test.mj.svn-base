@@ -1,0 +1,59 @@
+class Test {
+
+	private int num;
+	private Test tt;
+
+  public void bool(){
+  
+		boolean x = 3 > 2; // true
+		boolean y = x; // true
+		boolean z = 3 < 0; // false
+		boolean a = true && false; // false
+		boolean b = true && true; // true
+		boolean b2 = false && false; // false
+		boolean c = true || false; // true
+		boolean d = false ||true; // true
+		boolean e = false || false; // false
+		boolean f = true || true; // true
+	}
+	
+	public void diff(){
+		boolean a = 3==2; // false
+		boolean b = 3==0; // false
+		boolean e = 0==0; // true
+		
+		boolean a2 = 3!=2; // true
+		boolean b2 = 3!=0; // true
+		boolean e2 = 0!=0; // false
+	}
+	
+	public void testwhile(){
+	
+		int x = 3;
+		
+		while(x != 0) {
+			x = x-1;
+		}
+	}
+	
+	public void testif(){
+	
+		int x=2;
+		if (x < 3){
+			x = x +10;
+		}
+	}
+	
+	public void testnull(){
+		Test p = null;
+		boolean x = p==null;
+	}
+	
+	public void main(){
+		bool();
+		diff();
+		testwhile();
+		testif();
+		testnull();
+	}
+}
